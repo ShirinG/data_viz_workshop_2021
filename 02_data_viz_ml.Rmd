@@ -1,0 +1,479 @@
+---
+title: "Data Viz im Machine Learning"
+author: "Dr. Shirin Elsinghorst"
+date: "4/8/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Libraries
+
+```{r libraries}
+library(tidyverse)
+library(mlbench)
+library(ggfortify)
+library(GGally)
+library(scagnostics)
+library(mlr) 
+```
+
+## Dataset
+
+Pima Indians Diabetes dataset from [*mlbench* package](http://search.r-project.org/library/mlbench/html/PimaIndiansDiabetes.html).
+
+```{r}
+data(PimaIndiansDiabetes)
+PimaIndiansDiabetes %>%
+  head()
+```
+
+## Colors
+
+- set [colorblind-friendly palettes](https://jfly.uni-koeln.de/color/)
+
+```{r}
+# The palette with grey:
+cbp1 <- c("#999999", "#E69F00", "#56B4E9", "#009E73",
+          "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+```
+
+```{r}
+ggplot <- function(...) ggplot2::ggplot(...) + 
+  scale_color_manual(values = cbp1) +
+  scale_fill_manual(values = cbp1) + # note: needs to be overridden when using continuous color scales
+  theme_bw()
+```
+
+### Exploratory Data Analysis
+
+Exploratory Data Analysis (EDA) is the backbone of data analysis, including those that result in a machine learning model. EDA helps us to understand the data we are working with and put it into context, so that we are able to ask the right questions (or to put our questions into the right frame). It helps us take appropriate measures for cleaning, normalization/transformation, dealing with missing values, feature preparation and engineering, etc. Particularly if our machine learning model is trained on a limited dataset (but not only then!), appropriate data preparation can vastly improve the machine learning process: models will often train faster and achieve higher accuracy.
+
+An essential part of EDA is data visualization. 
+
+Typically, we want to start by exploring potential sources of errors in our data, like
+
+- **wrong/useless data types** (sometimes data types are automatically set in a way that is not useful for our analysis, like *factors* versus *strings*, or wrong/strange entries in an otherwise numeric column will make it categorical)
+- **missing values** (a collection of ways to visualize missingness can be found [here](https://cran.r-project.org/web/packages/naniar/vignettes/naniar-visualisation.html)),
+- **outliers** (for example by plotting a box-plot of continuous variables)
+
+Depending on the number of features/variables we have, it makes sense to look at them all individually and in correlation with each other. Depending on whether we have a categorical or continuous variable, we might be interested in properties that are shown by 
+
+- **histograms** (frequency distribution of binned continuous variables),
+- **density distribution** (normalized distribution of continuous variables) or 
+- **bar-plots** (shows counts of categorical variables).
+
+If our target variable is categorical, we will want to look at potential imbalances between the classes. Class imbalance will strongly affect the machine learning modeling process and will require us to consider up-/downsampling or similar techniques before we train a model.
+
+Correlation analysis can show us, for example
+
+- how our **target/dependent variable correlates with the remaining features** (often, just by looking at the correlation, we can identify one ore more feature that will have a strong impact on predicting the target because they are strongly correlated) or
+- whether some of the **independent variables/features correlate with each other** (multicolinearity; we might want to consider removing strongly correlated features, so that they won't contribute the "same" information multiple times to the model and thus lead to overfitting).
+
+Additional methods can be used to visualize groups of correlated features. These methods are often especially useful if we have a large dataset with a large feature set (highly dimensional data). Some of these methods for visualizing groups of correlated features and/or for comparing multiple variables and visualizing their relationships are:
+
+- Dimensionality reduction, e.g. linear:
+  - Principal Component Analysis (PCA, shows as much variation in data as possible)
+  or Non-linear (just a few of many) Minimize distortion, according to some metric
+  - Multidimensional scaling
+  - Sammon mapping
+  - T-SNE
+  - UMAP
+- Parallel coordinate plot
+- Scatterplot matrix
+- [scagnostics](https://cran.r-project.org/web/packages/scagnostics/index.html)
+
+```{r}
+# in our dataset,
+# continuous variables are
+PimaIndiansDiabetes %>%
+  select(where(is.numeric)) %>%
+  head()
+
+# 'diabetes' is the only categorical variable is also our target or dependent variable
+PimaIndiansDiabetes %>%
+  select(!where(is.numeric)) %>%
+  head()
+```
+
+```{r}
+# boxplot of features
+PimaIndiansDiabetes %>%
+  gather("key", "value", pregnant:age) %>%
+  ggplot(aes(x = value, fill = diabetes)) +
+    facet_wrap(vars(key), ncol = 3, scales = "free") +
+    geom_boxplot(alpha = 0.8)
+```
+
+```{r}
+# bar plot of target
+PimaIndiansDiabetes %>%
+  ggplot(aes(x = diabetes, fill = diabetes)) +
+    geom_bar(alpha = 0.8)
+```
+
+```{r}
+# histogram of features
+PimaIndiansDiabetes %>%
+  gather("key", "value", pregnant:age) %>%
+  ggplot(aes(x = value, fill = diabetes)) +
+    facet_wrap(vars(key), ncol = 3, scales = "free") +
+    geom_histogram(alpha = 0.8)
+```
+
+```{r}
+# histogram of feature
+PimaIndiansDiabetes %>%
+  gather("key", "value", pregnant:age) %>%
+  ggplot(aes(x = value, fill = diabetes)) +
+    facet_wrap(vars(key), ncol = 3, scales = "free") +
+    geom_density(alpha = 0.8)
+```
+
+```{r}
+# correlation plot of features
+mat <- PimaIndiansDiabetes %>%
+  select(where(is.numeric))
+
+cormat <- round(cor(mat), 2)
+
+cormat <- cormat %>%
+  as_data_frame() %>%
+  mutate(x = colnames(mat)) %>%
+  gather(key = "y", value = "value", pregnant:age)
+
+cormat %>%
+    remove_missing() %>%
+    arrange(x, y) %>%
+    ggplot(aes(x = x, y = y, fill = value)) + 
+    geom_tile() +
+    scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+     midpoint = 0, limit = c(-1,1), space = "Lab", 
+     name = "Pearson\nCorrelation") +
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+    coord_fixed()
+```
+
+```{r}
+# PCA
+prep <- PimaIndiansDiabetes %>%
+  select(where(is.numeric))
+
+pca <- prep %>%
+  prcomp(scale. = TRUE)
+
+autoplot(pca, 
+                data = PimaIndiansDiabetes, 
+                colour = 'diabetes',
+                shape = 'diabetes',
+                loadings = TRUE, 
+                loadings.colour = 'blue',
+                loadings.label = TRUE, 
+                loadings.label.size = 3) +
+      scale_color_manual(values = cbp1) +
+  scale_fill_manual(values = cbp1) +
+  theme_bw()
+```
+
+```{r}
+# MDS
+d <- dist(prep) # euclidean distances between the rows
+fit <- cmdscale(d,eig=TRUE, k=2) # k is the number of dim
+fit
+```
+
+```{r}
+# Sammon mapping
+library(MASS)
+sam <- sammon(dist(prep))
+sam
+```
+
+- [Isomap](https://www.rdocumentation.org/packages/vegan/versions/2.4-2/topics/isomap)
+- [t-SNE](https://cran.r-project.org/web/packages/tsne/tsne.pdf)
+- [UMAP](https://cran.r-project.org/web/packages/umap/vignettes/umap.html)
+
+```{r}
+# parallel coordinate plots
+ggparcoord(data = PimaIndiansDiabetes, 
+           columns = c(1:8), 
+           groupColumn = 9,
+           scale = "robust",
+           order = "skewness",
+           alpha = 0.7)
+```
+
+```{r}
+# scatterplot matrix
+ggpairs(PimaIndiansDiabetes, 
+        columns = c(1:8),
+        alpha = 0.7)
+```
+
+```{r}
+# scagnostics
+scagnostics_dataset <- scagnostics(PimaIndiansDiabetes)
+
+# scagnostics grid
+scagnostics_grid_dataset <- scagnosticsGrid(scagnostics_dataset)
+
+# outliers
+scagnostics_o_dataset <- scagnosticsOutliers(scagnostics_dataset)
+scagnostics_o_dataset[scagnostics_o_dataset]
+outlier <- scagnostics_grid_dataset[scagnostics_o_dataset,]
+
+# scagnostics exemplars
+scagnostics_ex_dataset <- scagnosticsExemplars(scagnostics_dataset)
+scagnostics_ex_dataset[scagnostics_ex_dataset]
+exemplars <- scagnostics_grid_dataset[scagnostics_ex_dataset,]
+```
+
+### Training a machine learning model
+
+```{r}
+set.seed(1000) 
+
+train_index <- sample(1:nrow(PimaIndiansDiabetes), 0.8 * nrow(PimaIndiansDiabetes)) 
+test_index <- setdiff(1:nrow(PimaIndiansDiabetes), train_index) 
+
+train <- PimaIndiansDiabetes[train_index,] 
+test <- PimaIndiansDiabetes[test_index,]
+
+list( train = summary(train), test = summary(test) )
+
+(dt_task <- makeClassifTask(data=train, target="diabetes"))
+(dt_prob <- makeLearner('classif.rpart', predict.type="prob"))
+```
+
+### Hyperparameter Optimization
+
+```{r}
+getParamSet("classif.rpart")
+```
+
+```{r}
+dt_param <- makeParamSet( 
+  makeDiscreteParam("minsplit", values=seq(5,10,1)), 
+  makeDiscreteParam("minbucket", values=seq(round(5/3,0), round(10/3,0), 1)), 
+  makeNumericParam("cp", lower = 0.01, upper = 0.05), 
+  makeDiscreteParam("maxcompete", values=6), 
+  makeDiscreteParam("usesurrogate", values=0), 
+  makeDiscreteParam("maxdepth", values=10) )
+
+ctrl = makeTuneControlGrid()
+
+rdesc = makeResampleDesc("CV", iters = 3L, stratify=TRUE)
+```
+
+```{r}
+set.seed(1000) 
+(dt_tuneparam <- tuneParams(learner=dt_prob, 
+                 resampling=rdesc, 
+                 measures=list(tpr,auc, fnr, mmce, tnr, setAggregation(tpr, test.sd)), 
+                 par.set=dt_param, 
+                 control=ctrl, 
+                 task=dt_task, 
+                 show.info = TRUE) )
+```
+
+```{r}
+data = generateHyperParsEffectData(dt_tuneparam, partial.dep = TRUE)
+plotHyperParsEffect(data, x = "maxdepth", y = "auc.test.mean", partial.dep.learn = makeLearner("regr.gbm"))
+
+plotHyperParsEffect(data, x = "C", y = "sigma", z = "mmce.test.mean",
+  plot.type = "heatmap", interpolate = "regr.earth")
+```
+
+```{r}
+list( `Optimal HyperParameters` = dt_tuneparam$x, 
+      `Optimal Metrics` = dt_tuneparam$y )
+```
+
+```{r}
+dtree <- setHyperPars(dt_prob, par.vals = dt_tuneparam$x)
+
+set.seed(1000) 
+dtree_train <- train(learner=dtree, task=dt_task) 
+getLearnerModel(dtree_train)
+```
+
+### Decision Trees
+
+```{r}
+library(rpart.plot)
+rpart.plot(dtree_train$learner.model, roundint=FALSE, varlen=3, type = 3, clip.right.labs = FALSE, yesno = 2)
+```
+
+```{r}
+rpart.rules(dtree_train$learner.model, roundint = FALSE)
+```
+
+### Prediction
+
+```{r}
+set.seed(1000) 
+(dtree_predict <- predict(dtree_train, newdata = test))
+dtree_predict %>% calculateROCMeasures()
+
+model_performance <- performance(dtree_predict, measures = list(tpr,auc,mmce, acc,tnr)) %>% 
+  as.data.frame(row.names = c("True Positive","Area Under Curve", "Mean Misclassification Error","Accuracy","True Negative")) 
+
+model_performance
+```
+
+```{r}
+(dtree_threshold <- generateThreshVsPerfData(dtree_predict, measures = list(tpr,auc, mmce,tnr)) %>% plotThreshVsPerf() + geom_point() )
+```
+
+```{r}
+list( 
+`TPR Threshold for 100%` = tpr_threshold100 <- dtree_threshold$data$threshold[ which.max(dtree_threshold$data$performance[ dtree_threshold$data$measure=="True positive rate"]<1)], 
+`TPR Threshold for 80%` = tpr_threshold80 <- dtree_threshold$data$threshold[ which.min(dtree_threshold$data$performance[ dtree_threshold$data$measure=="True positive rate"]>0.80)], 
+`Average Threshold` = avg_threshold <- mean(c(tpr_threshold100,tpr_threshold80)), 
+`TNR Threshold for 80%` = tnr_threshold80 <- dtree_threshold$data$threshold[ which.max(dtree_threshold$data$performance[ dtree_threshold$data$measure=="True negative rate"]>0.70)] )
+```
+
+```{r}
+DecisionTree <- dtree_predict %>% setThreshold(avg_threshold) 
+(dt_performance <- DecisionTree %>% performance(measures = list(tpr,auc, mmce,tnr)) )
+(dt_cm <- DecisionTree %>% calculateROCMeasures() )
+```
+
+```{r}
+performance_threshold <- performance(DecisionTree, measures = list(tpr,auc, mmce, acc, tnr)) %>% 
+  as.data.frame(row.names = c("True Positive","Area Under Curve", "Mean Misclassification Error","Accuracy","True Negative"))
+performance_threshold
+```
+
+### Decision Boundaries
+
+```{r}
+#remotes::install_github("grantmcdermott/parttree")
+library(parsnip)
+library(parttree)
+set.seed(123) ## For consistent jitter
+
+## Build our tree using parsnip (but with rpart as the model engine)
+ti_tree =
+  decision_tree() %>%
+  set_engine("rpart") %>%
+  set_mode("classification") %>%
+  fit(diabetes ~ glucose + age, data = PimaIndiansDiabetes)
+
+## Plot the data and model partitions
+PimaIndiansDiabetes %>%
+  ggplot(aes(x=glucose, y=age)) +
+  geom_jitter(aes(col=diabetes), alpha=0.7) +
+  geom_parttree(data = ti_tree, aes(fill=diabetes), alpha = 0.1) +
+  theme_minimal()
+```
+
+https://michael.hahsler.net/SMU/EMIS7332/R/viz_classifier.html
+
+```{r}
+decisionplot <- function(model, data, class = NULL, predict_type = "class",
+  resolution = 100, showgrid = TRUE, ...) {
+
+  if(!is.null(class)) cl <- data[,class] else cl <- 1
+  data <- data[,1:2]
+  k <- length(unique(cl))
+
+  plot(data, col = as.integer(cl)+1L, pch = as.integer(cl)+1L, ...)
+
+  # make grid
+  r <- sapply(data, range, na.rm = TRUE)
+  xs <- seq(r[1,1], r[2,1], length.out = resolution)
+  ys <- seq(r[1,2], r[2,2], length.out = resolution)
+  g <- cbind(rep(xs, each=resolution), rep(ys, time = resolution))
+  colnames(g) <- colnames(r)
+  g <- as.data.frame(g)
+
+  ### guess how to get class labels from predict
+  ### (unfortunately not very consistent between models)
+  p <- predict(model, g, type = predict_type)
+  if(is.list(p)) p <- p$class
+  p <- as.factor(p)
+
+  if(showgrid) points(g, col = as.integer(p)+1L, pch = ".")
+
+  z <- matrix(as.integer(p), nrow = resolution, byrow = TRUE)
+  contour(xs, ys, z, add = TRUE, drawlabels = FALSE,
+    lwd = 2, levels = (1:(k-1))+.5)
+
+  invisible(z)
+}
+```
+
+```{r}
+library(e1071)
+model <- naiveBayes(diabetes ~ ., data=PimaIndiansDiabetes)
+decisionplot(model, PimaIndiansDiabetes, class = "diabetes", main = "naive Bayes")
+```
+
+### ANNs
+
+Li et al, Visualizing the Loss Landscape of Neural Nets, 2018
+
+http://yosinski.com/deepvis
+
+http://cs231n.stanford.edu/slides/2018/cs231n_2018_lecture13.pdf
+
+https://projector.tensorflow.org/
+
+![https://shirinsplayground.netlify.app/2020/09/keras_funct_api/](https://shirinsplayground.netlify.com/img/plot_model_4.png)
+https://shirinsplayground.netlify.app/2020/10/keras_workshop_user20/
+
+![https://shirinsplayground.netlify.app/2020/09/keras_fruits_update/](https://shirinsplayground.netlify.com/img/hist.png)
+![https://shirinsplayground.netlify.app/2020/09/keras_fruits_update/](https://shirinsplayground.netlify.com/img/percentage_pred.png)
+![https://shirinsplayground.netlify.app/2020/09/keras_fruits_update/](https://shirinsplayground.netlify.com/img/percentage_pred_cor.png)
+
+### Learning rates
+
+http://web.cse.ohio-state.edu/~wang.6195/vis-final/index.html
+
+### Graphical representation of a model in TensorBoard
+
+https://www.tensorflow.org/tensorboard
+
+### Word Embeddings
+
+The Unreasonable Effectiveness of Recurrent Neural Networks; Karpathy, 2015 
+
+Seq2Seq-Vis:
+Visual Debugging Tool for Sequence-to-Sequence Models; Strobelt, 2018
+
+https://arxiv.org/pdf/1611.04558.pdf
+
+### Translation
+
+http://seq2seq-vis.io/
+
+### Explainable AI
+
+https://shirinsplayground.netlify.app/2018/12/customer_churn_code/
+
+### Image classifiers are effective in practice
+
+Visualizing and Understanding Convolutional Networks; Zeiler & Fergus, 2013
+
+The Building Blocks of Interpretability; Olah, Satyanarayan, Johnson, Carter, Schubert, Ye, Mordvintsev
+
+playground.tensorflow.org
+
+Distill.pub
+
+research.google.com/bigpicture/attacking-discrimination-in-ml
+
+Google Creative Lab: https://quickdraw.withgoogle.com/
+
+https://poloclub.github.io/ganlab/
+
+http://lstm.seas.harvard.edu/
+
+---
+
+```{r}
+devtools::session_info()
+```
