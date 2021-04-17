@@ -400,58 +400,94 @@ list( `Optimal HyperParameters` = dt_tuneparam$x,
 ```
 
 ```{r}
-dtree <- setHyperPars(dt_prob, par.vals = dt_tuneparam$x)
+gbm_final <- setHyperPars(dt_prob, par.vals = dt_tuneparam$x)
 
 set.seed(1000) 
-dtree_train <- train(learner=dtree, task=dt_task) 
-getLearnerModel(dtree_train)
+gbm_final_train <- train(learner = gbm_final, task = dt_task) 
+getLearnerModel(gbm_final_train)
 ```
 
 ### Decision Trees
 
+- Recursive Partitioning ([`rpart`](https://cran.r-project.org/web/packages/rpart/vignettes/longintro.pdf) & [`rpart.plot`](http://www.milbo.org/rpart-plot/prp.pdf))
+
 ```{r}
+library(rpart)
 library(rpart.plot)
-rpart.plot(dtree_train$learner.model, roundint=FALSE, varlen=3, type = 3, clip.right.labs = FALSE, yesno = 2)
+
+rpart_tree <- rpart(diabetes ~ .,
+                    data = train,
+                    method = "class")
 ```
 
 ```{r}
-rpart.rules(dtree_train$learner.model, roundint = FALSE)
+rpart.plot(rpart_tree, 
+           roundint=FALSE, 
+           type = 3, 
+           clip.right.labs = FALSE)
+```
+
+```{r}
+rpart.rules(rpart_tree, roundint = FALSE)
 ```
 
 ### Prediction
 
 ```{r}
 set.seed(1000) 
-(dtree_predict <- predict(dtree_train, newdata = test))
-dtree_predict %>% calculateROCMeasures()
+(gbm_final_predict <- predict(gbm_final_train, newdata = test))
+gbm_final_predict %>% calculateROCMeasures()
+```
 
-model_performance <- performance(dtree_predict, measures = list(tpr,auc,mmce, acc,tnr)) %>% 
-  as.data.frame(row.names = c("True Positive","Area Under Curve", "Mean Misclassification Error","Accuracy","True Negative")) 
+```{r}
+model_performance <- performance(gbm_final_predict, 
+                                 measures = list(tpr, auc, mmce, acc, tnr)) %>% 
+  as.data.frame(row.names = c("True Positive Rate","Area Under Curve", "Mean Misclassification Error","Accuracy","True Negative Rate")) 
 
 model_performance
 ```
 
 ```{r}
-(dtree_threshold <- generateThreshVsPerfData(dtree_predict, measures = list(tpr,auc, mmce,tnr)) %>% plotThreshVsPerf() + geom_point() )
+gbm_final_threshold <- generateThreshVsPerfData(gbm_final_predict, 
+                                                 measures = list(tpr, auc, mmce, tnr))
 ```
 
 ```{r}
-list( 
-`TPR Threshold for 100%` = tpr_threshold100 <- dtree_threshold$data$threshold[ which.max(dtree_threshold$data$performance[ dtree_threshold$data$measure=="True positive rate"]<1)], 
-`TPR Threshold for 80%` = tpr_threshold80 <- dtree_threshold$data$threshold[ which.min(dtree_threshold$data$performance[ dtree_threshold$data$measure=="True positive rate"]>0.80)], 
-`Average Threshold` = avg_threshold <- mean(c(tpr_threshold100,tpr_threshold80)), 
-`TNR Threshold for 80%` = tnr_threshold80 <- dtree_threshold$data$threshold[ which.max(dtree_threshold$data$performance[ dtree_threshold$data$measure=="True negative rate"]>0.70)] )
+gbm_final_threshold %>% 
+   plotROCCurves() + 
+   geom_point() +
+    theme_bw() +
+    labs(title = "ROC curve from predictions",
+         subtitle = "of GBM model with reduced feature set",
+         caption = "Source: Pima Indians Diabetes Database")
 ```
 
 ```{r}
-DecisionTree <- dtree_predict %>% setThreshold(avg_threshold) 
-(dt_performance <- DecisionTree %>% performance(measures = list(tpr,auc, mmce,tnr)) )
-(dt_cm <- DecisionTree %>% calculateROCMeasures() )
+gbm_final_threshold %>% 
+   plotThreshVsPerf() + 
+   geom_point() +
+    theme_bw() +
+    labs(title = "Threshold vs. performance",
+         subtitle = "for 2-class classification of GBM model with reduced feature set",
+         caption = "Source: Pima Indians Diabetes Database")
 ```
 
 ```{r}
-performance_threshold <- performance(DecisionTree, measures = list(tpr,auc, mmce, acc, tnr)) %>% 
-  as.data.frame(row.names = c("True Positive","Area Under Curve", "Mean Misclassification Error","Accuracy","True Negative"))
+gbm_final_threshold$data
+```
+
+```{r}
+gbm_final_thr <- gbm_final_predict %>% 
+  setThreshold(0.59595960) 
+
+(dt_performance <- gbm_final_thr %>% performance(measures = list(tpr, auc, mmce, tnr)) )
+(dt_cm <- gbm_final_thr %>% calculateROCMeasures() )
+```
+
+```{r}
+performance_threshold <- performance(gbm_final_thr, measures = list(tpr, auc, mmce, acc, tnr)) %>% 
+  as.data.frame(row.names = c("True Positive Rate", "Area Under Curve", "Mean Misclassification Error", "Accuracy", "True Negative Rate"))
+
 performance_threshold
 ```
 
@@ -468,56 +504,17 @@ ti_tree =
   decision_tree() %>%
   set_engine("rpart") %>%
   set_mode("classification") %>%
-  fit(diabetes ~ glucose + age, data = PimaIndiansDiabetes)
+  fit(diabetes ~ glucose + mass, data = PimaIndiansDiabetes)
 
 ## Plot the data and model partitions
 PimaIndiansDiabetes %>%
-  ggplot(aes(x=glucose, y=age)) +
-  geom_jitter(aes(col=diabetes), alpha=0.7) +
-  geom_parttree(data = ti_tree, aes(fill=diabetes), alpha = 0.1) +
-  theme_minimal()
-```
-
-https://michael.hahsler.net/SMU/EMIS7332/R/viz_classifier.html
-
-```{r}
-decisionplot <- function(model, data, class = NULL, predict_type = "class",
-  resolution = 100, showgrid = TRUE, ...) {
-
-  if(!is.null(class)) cl <- data[,class] else cl <- 1
-  data <- data[,1:2]
-  k <- length(unique(cl))
-
-  plot(data, col = as.integer(cl)+1L, pch = as.integer(cl)+1L, ...)
-
-  # make grid
-  r <- sapply(data, range, na.rm = TRUE)
-  xs <- seq(r[1,1], r[2,1], length.out = resolution)
-  ys <- seq(r[1,2], r[2,2], length.out = resolution)
-  g <- cbind(rep(xs, each=resolution), rep(ys, time = resolution))
-  colnames(g) <- colnames(r)
-  g <- as.data.frame(g)
-
-  ### guess how to get class labels from predict
-  ### (unfortunately not very consistent between models)
-  p <- predict(model, g, type = predict_type)
-  if(is.list(p)) p <- p$class
-  p <- as.factor(p)
-
-  if(showgrid) points(g, col = as.integer(p)+1L, pch = ".")
-
-  z <- matrix(as.integer(p), nrow = resolution, byrow = TRUE)
-  contour(xs, ys, z, add = TRUE, drawlabels = FALSE,
-    lwd = 2, levels = (1:(k-1))+.5)
-
-  invisible(z)
-}
-```
-
-```{r}
-library(e1071)
-model <- naiveBayes(diabetes ~ ., data=PimaIndiansDiabetes)
-decisionplot(model, PimaIndiansDiabetes, class = "diabetes", main = "naive Bayes")
+  ggplot(aes(x = glucose, y = mass)) +
+  geom_jitter(aes(col = diabetes), alpha = 0.7) +
+  geom_parttree(data = ti_tree, aes(fill = diabetes), alpha = 0.1) +
+  theme_bw() +
+    labs(title = "Decision boundaries",
+         subtitle = "for 2-class classification of RPART model (glucose + mass)",
+         caption = "Source: Pima Indians Diabetes Database")
 ```
 
 ### ANNs

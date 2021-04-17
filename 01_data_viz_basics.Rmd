@@ -66,6 +66,49 @@ ggplot <- function(...) ggplot2::ggplot(...) +
   theme_bw()
 ```
 
+## Tidyverse
+
+```{r}
+penguins
+```
+
+```{r}
+penguins %>%
+  gather("key", "value", bill_length_mm:body_mass_g) %>%
+  head()
+```
+
+```{r}
+penguins %>%
+  group_by(species, sex) %>%
+  count(island) %>%
+  arrange(desc(n))
+```
+
+```{r}
+penguins %>%
+  gather("key", "value", bill_length_mm:body_mass_g) %>%
+  group_by(species, sex, island, key) %>%
+  summarise(n = n(),
+            sum = sum(value),
+            mean = mean(value),
+            median = median(value),
+            sd = sd(value),
+            se = sd(value) / sqrt(n()))
+```
+
+```{r}
+penguins %>%
+  group_by(species, sex, island, year) %>%
+  summarise_each(funs(sum, 
+                      mean, 
+                      median, 
+                      sd, 
+                      se = sd(.) / sqrt(n())
+                      )
+                 )
+```
+
 ## Main diagram types
 
 ### Pointcharts
@@ -92,6 +135,30 @@ penguins %>%
     ggplot(aes(x = bill_length_mm, y = flipper_length_mm,
               color = species, shape = species)) +
     geom_point(alpha = 0.7) +
+    labs(x = "Bill length (mm)", 
+         y = "Flipper length (mm)",
+        title = "Scatterplot", 
+        subtitle = "Penguins bill v. flipper length by species",
+        caption = "Source: https://github.com/allisonhorst/palmerpenguins")
+```
+
+- with labels/text
+
+```{r}
+max_lables <- penguins %>%
+    remove_missing() %>%
+    group_by(species, island) %>%
+    summarise(bill_length_mm = max(bill_length_mm),
+              flipper_length_mm = max(flipper_length_mm))
+```
+
+```{r}
+penguins %>%
+    remove_missing() %>%
+    ggplot(aes(x = bill_length_mm, y = flipper_length_mm,
+              color = species, shape = species)) +
+    geom_point(alpha = 0.7) +
+    geom_text(data = max_lables, aes(label = island)) +
     labs(x = "Bill length (mm)", 
          y = "Flipper length (mm)",
         title = "Scatterplot", 
@@ -483,15 +550,16 @@ penguins_hist <- penguins_hist %>%
 ```
 
 ```{r}
-#hc <- hclust(dist(penguins_hist, method = "euclidean"), method = "ward.D2")
-#ggdendrogram(hc)
+hc <- hclust(dist(penguins_hist, method = "euclidean"), method = "ward.D2")
+ggdendrogram(hc)
 
 # Create a dendrogram and plot it
 penguins_hist %>%  
   scale %>% 
   dist(method = "euclidean") %>%
   hclust(method = "ward.D2") %>% 
-  as.dendrogram
+  as.dendrogram() %>%
+  plot()
 ```
 
 ### Waterfall charts
