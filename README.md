@@ -12,6 +12,10 @@ https://github.com/ShirinG/data_viz_workshop_2021
 
 https://docs.google.com/presentation/d/e/2PACX-1vR4pD2EmW9Gzxr1Q3qwgjEYkU64o2-ThlX1mXqfNQ2EKteVUVt6Qg2ImEKKi9XLv-Iutb3lD8esLyU7/pub?start=false&loop=false&delayms=3000
 
+- Tidyverse
+
+https://www.tidyverse.org/packages/
+
 - ggplot2 Cheatsheet
 
 https://rstudio.com/wp-content/uploads/2015/03/ggplot2-cheatsheet.pdf
