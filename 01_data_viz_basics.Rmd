@@ -316,6 +316,32 @@ penguins %>%
           caption = "Source: https://github.com/allisonhorst/palmerpenguins")
 ```
 
+### Plotly
+
+```{r}
+library(plotly)
+
+p <- penguins %>%
+    remove_missing() %>%
+    group_by(species, sex) %>%
+    summarise(mean_bmg = mean(body_mass_g),
+              sd_bmg = sd(body_mass_g)) %>%
+    ggplot(aes(x = species, y = mean_bmg,
+               fill = sex)) +
+    geom_bar(stat = "identity", position = "dodge") +
+    geom_errorbar(aes(ymin = mean_bmg - sd_bmg, 
+                      ymax = mean_bmg + sd_bmg), 
+                  width = 0.2,
+                 position = position_dodge(0.9)) +
+      labs(x = "Species", 
+           y = "Mean body mass (in g)",
+          title = "Barchart", 
+          subtitle = "Mean body mass of male & female penguins per species\nwith standard deviation",
+          caption = "Source: https://github.com/allisonhorst/palmerpenguins")
+
+ggplotly(p)
+```
+
 ### Boxplots
 
 ```{r}

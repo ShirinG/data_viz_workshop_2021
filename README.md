@@ -29,3 +29,5 @@ https://github.com/clauswilke/dataviz
 - Plotly
 
 https://plotly.com/r/
+
+https://plotly.com/ggplot2/getting-started/
