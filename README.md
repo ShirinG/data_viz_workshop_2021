@@ -4,7 +4,7 @@ Datenvisualisierung ist ein entscheidender Teil jeder Analyse. Sei es, um Zusamm
 
 https://ml-summit.de/machine-learing/the-good-the-bad-and-the-ugly-analysen-effektiv-visualisieren-und-kommunizieren/
 
-## Ressources
+## Resources
 
 https://github.com/ShirinG/data_viz_workshop_2021
 
