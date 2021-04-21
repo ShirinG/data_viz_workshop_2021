@@ -25,3 +25,7 @@ https://rstudio.com/wp-content/uploads/2015/03/ggplot2-cheatsheet.pdf
 https://clauswilke.com/dataviz/directory-of-visualizations.html
 
 https://github.com/clauswilke/dataviz
+
+- Plotly
+
+https://plotly.com/r/
