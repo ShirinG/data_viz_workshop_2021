@@ -2,7 +2,9 @@
 title: "Data Viz Grundlagen"
 author: "Dr. Shirin Elsinghorst"
 date: "4/8/2021"
-output: html_document
+output:
+  html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -73,15 +75,14 @@ penguins
 ```
 
 ```{r}
-penguins %>%
-  gather("key", "value", bill_length_mm:body_mass_g) %>%
-  head()
+penguins_long <- penguins %>%
+  gather("key", "value", bill_length_mm:body_mass_g)
 ```
 
 ```{r}
 penguins %>%
-  group_by(species, sex) %>%
-  count(island) %>%
+  group_by(species) %>%
+  count(sex) %>%
   arrange(desc(n))
 ```
 
@@ -116,11 +117,11 @@ penguins %>%
 ```{r}
 penguins %>%
     remove_missing() %>%
-    ggplot(aes(x = bill_length_mm, y = flipper_length_mm)) +
+    ggplot(aes(x = bill_length_mm, y = flipper_length_mm, color = species)) +
     geom_jitter(alpha = 0.5) +
-    facet_wrap(vars(species), ncol = 3) +
-    scale_x_reverse() +
-    scale_y_reverse() +
+    #facet_wrap(vars(species), ncol = 3) +
+    #scale_x_reverse() +
+    #scale_y_reverse() +
     labs(x = "Bill length (mm)", 
          y = "Flipper length (mm)",
          size = "body mass (g)",
@@ -239,6 +240,8 @@ mat <- penguins %>%
   remove_missing() %>%
   select(bill_depth_mm, bill_length_mm, body_mass_g, flipper_length_mm)
 
+str(mat)
+
 cormat <- round(cor(mat), 2)
 cormat[upper.tri(cormat)] <- NA
 
@@ -345,7 +348,7 @@ ggplotly(p)
 ### Boxplots
 
 ```{r}
-penguins %>%
+pp <- penguins %>%
     remove_missing() %>%
     ggplot(aes(x = species, y = body_mass_g,
                fill = sex)) +
@@ -355,6 +358,8 @@ penguins %>%
           title = "Boxplot", 
           subtitle = "Body mass of three penguin species per sex",
           caption = "Source: https://github.com/allisonhorst/palmerpenguins")
+
+ggplotly(pp)
 ```
 
 - with points
